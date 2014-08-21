@@ -1,0 +1,23 @@
+{
+    "name": "alfanso/activity-tracker",
+    "description": "Laravel package to track activities throughout application.",
+    "authors": [
+        {
+            "name": "Ashit Vora",
+            "email": "ashit.vora@alfanso.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "illuminate/support": "4.1.*"
+    },
+    "autoload": {
+        "classmap": [
+            "src/migrations"
+        ],
+        "psr-0": {
+            "Alfanso\\ActivityTracker\\": "src/"
+        }
+    },
+    "minimum-stability": "stable"
+}
