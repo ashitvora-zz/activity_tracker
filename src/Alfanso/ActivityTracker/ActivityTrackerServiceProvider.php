@@ -33,7 +33,7 @@ class ActivityTrackerServiceProvider extends ServiceProvider {
 	{
 		Event::listen('activity.track', function($action = null)
 		{
-			if(! is_null($action)){
+			if(! is_null($action) && ! Auth::guest()){
 				Activity::insert(array(
 					'actor_id' 		=> Auth::user()->id,
 					'action'	 		=> $action,
