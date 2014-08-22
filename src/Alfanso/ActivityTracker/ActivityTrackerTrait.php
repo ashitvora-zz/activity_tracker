@@ -6,8 +6,6 @@ use DateTime;
 
 trait ActivityTrackerTrait
 {
-
-    private $isUpdating;
     private $dirtyFields;
     private $oldData;
 
@@ -21,12 +19,16 @@ trait ActivityTrackerTrait
     {
         parent::boot();
 
-        static::saving(function ($model) {
-            $model->onSaving();
+        static::created(function ($model) {
+            $model->onCreate();
         });
 
-        static::saved(function ($model) {
-            $model->onSave();
+        static::updating(function ($model) {
+            $model->onUpdating();
+        });
+
+        static::updated(function ($model) {
+            $model->onUpdate();
         });
 
         static::deleted(function ($model) {
@@ -52,71 +54,75 @@ trait ActivityTrackerTrait
 
 
     /**
-     * Invoked before a model is saved. Return false to abort the operation.
+     * Invoked after a model is created.
      *
      * @return bool
      */
-    public function onSaving()
+    public function onCreate()
     {
-        // Check if its update
-        $this->isUpdating = $this->exists;
+        Activity::insert(array(
+            'actor_id'       => Auth::user()->id,
+            'trackable_type' => get_class($this),
+            'action'         => "created",
+            'details'        => $this->toJson(),
+            'trackable_id'   => $this->id,
+            'created_at'     => new DateTime(),
+            'updated_at'     => new DateTime()
+        ));
+    }
 
+
+     /**
+     * Invoked before a model is updating.
+     *
+     * @return bool
+     */
+    public function onUpdating()
+    {
         $this->oldData     = $this->original;
         $this->dirtyFields = array_keys($this->getDirty());
     }
 
 
     /**
-     * Called after a model is successfully saved.
+     * Called after a model is successfully updated.
      *
      * @return void
      */
-    public function onSave()
+    public function onUpdate()
     {
-        $activities = array(
+        // Return if fields to track are not defined or empty in model
+        if(!isset($this->fieldsToTrack) || empty($this->fieldsToTrack)) return;
+
+
+        $newData    = $this->attributes;
+        $oldData    = $this->oldData;
+        $fields     = array();
+
+        foreach ($this->dirtyFields as $field) {
+
+            // if field is in track list then track it otherwise skip inserting log
+            if(! in_array($field, $this->fieldsToTrack)) continue;
+
+            if($newData[$field] != $oldData[$field]){
+                $fields[$field] = array(
+                    'old_value' => $oldData[$field],
+                    'new_value' => $newData[$field]
+                );
+            }
+        }
+
+        if(empty($fields)) return;
+
+        Activity::insert(array(
             'actor_id'       => Auth::user()->id,
             'trackable_type' => get_class($this),
-            'action'         => $this->isUpdating ? "updated":"created",
+            'action'         => "updated",
+            'details'        => json_encode($fields),
             'trackable_id'   => $this->id,
             'created_at'     => new DateTime(),
             'updated_at'     => new DateTime()
-        );
-
-        // Log that model is being updated
-        // Else Log that model is being added
-        if($this->isUpdating){
-
-            // Return if fields to track are not defined or empty in model
-            if(!isset($this->fieldsToTrack) || empty($this->fieldsToTrack)) return;
-
-            $newData    = $this->original;
-            $oldData    = $this->oldData;
-            $fields     = array();
-
-            foreach ($this->dirtyFields as $field) {
-
-                // if field is in track list then track it otherwise skip inserting log
-                if(! in_array($field, $this->fieldsToTrack)) continue;
-
-                if($newData[$field] != $oldData[$field]){
-                    $fields[$field] = array(
-                        'old_value' => $oldData[$field],
-                        'new_value' => $newData[$field]
-                    );
-                }
-            }
-
-
-            if(empty($fields)) return;
-
-            $activities['details'] = json_encode($fields);
-
-            Activity::insert($activities);
-
-        } else {
-            $activities['details'] = $this->toJson();
-            Activity::insert($activities);
-        }
+        ));
     }
 
 
